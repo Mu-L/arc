@@ -1,0 +1,67 @@
+name: Release Publish
+
+# Triggers when a draft release is published
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY_GHCR: ghcr.io
+  IMAGE_NAME: basekick-labs/arc
+
+jobs:
+  update-latest-tag:
+    name: Update :latest Docker Tag
+    runs-on: ubuntu-latest
+    if: "!github.event.release.prerelease"  # Only for non-prerelease versions
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Extract version from tag (v25.11.2 -> 25.11.2)
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Updating :latest tag for version: $VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update :latest tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          echo "Pulling version-tagged image..."
+          docker pull ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${VERSION}
+
+          echo "Creating :latest manifest from multi-arch image..."
+          # Use buildx imagetools to copy multi-arch manifest to :latest
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${VERSION}
+
+          echo "✅ :latest tag updated successfully!"
+
+      - name: Summary
+        run: |
+          echo "## 🎉 :latest Tag Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version **${{ steps.version.outputs.version }}** is now :latest" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Available Tags" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest\` ⬅️ Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Multi-arch support: amd64, arm64" >> $GITHUB_STEP_SUMMARY

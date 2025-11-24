@@ -162,11 +162,33 @@ Files: [api/retention_routes.py](api/retention_routes.py)
 
 ---
 
+### Automatic `:latest` Docker Tag Updates
+
+When you publish a release on GitHub, Arc now automatically updates the `:latest` Docker tag to point to the newly released version. This eliminates the need for manual Docker tagging after each release.
+
+**How it works**:
+- GitHub Actions workflow triggers when you publish a release (not draft)
+- Automatically pulls the versioned multi-arch image
+- Creates a new `:latest` tag pointing to the release version
+- Pushes `:latest` to GitHub Container Registry
+- Only applies to stable releases (skips prereleases)
+
+**Benefits**:
+- Users can always pull the latest stable version with `docker pull ghcr.io/basekick-labs/arc:latest`
+- No manual intervention needed after publishing releases
+- Maintains multi-arch support (amd64 + arm64) for `:latest` tag
+- Ensures `:latest` only points to reviewed and published releases
+
+**Workflow**: [.github/workflows/release-publish.yml](.github/workflows/release-publish.yml)
+
+---
+
 ## 🔧 Technical Details
 
 ### New Files
 - `api/partition_pruner.py` - Core partition pruning engine (shared by queries and deletes)
 - `api/parquet_stats_filter.py` - Statistics-based file filtering
+- `.github/workflows/release-publish.yml` - Automatic `:latest` Docker tag update on release publish
 
 ### Modified Files
 - `api/duckdb_engine.py` - Integrated partition pruner with query execution
